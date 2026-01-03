@@ -7,4 +7,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@tursodatabase/database-wasm'],
   },
+  base: '/llm-explorer/',
 })
