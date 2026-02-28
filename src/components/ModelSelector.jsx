@@ -77,7 +77,7 @@ export default function ModelSelector({ selectedModels = [], onChange, provider,
         style={{ marginBottom: '8px' }}
       />
       <div style={{ maxHeight: 280, overflowY: 'auto', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px' }}>
-        <ActionList selectionVariant="multiple">
+        <ActionList selectionVariant="multiple" role="listbox" aria-label="Select models">
           {filtered.map((m) => {
             const id = getModelId(m);
             const selected = selectedModels.includes(id);
