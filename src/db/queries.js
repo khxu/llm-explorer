@@ -4,7 +4,8 @@ import { database, checkpoint } from './connection.js';
 
 export async function saveApiKey(provider, apiKey, baseUrl = null) {
   const stmt = database.prepare(
-    'INSERT OR REPLACE INTO api_keys (provider, api_key, base_url) VALUES (?, ?, ?)'
+    `INSERT INTO api_keys (provider, api_key, base_url) VALUES (?, ?, ?)
+     ON CONFLICT(provider) DO UPDATE SET api_key = excluded.api_key, base_url = excluded.base_url`
   );
   await stmt.run(provider, apiKey, baseUrl);
   await checkpoint();

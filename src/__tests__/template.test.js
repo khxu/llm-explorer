@@ -38,6 +38,11 @@ describe('interpolate', () => {
     expect(interpolate('Hello {{name}}!', {})).toBe('Hello {{name}}!');
   });
 
+  it('returns null/undefined for null/undefined template', () => {
+    expect(interpolate(null, { name: 'World' })).toBeNull();
+    expect(interpolate(undefined, { name: 'World' })).toBeUndefined();
+  });
+
   it('replaces duplicate placeholders', () => {
     expect(interpolate('{{x}} and {{x}}', { x: 'val' })).toBe('val and val');
   });

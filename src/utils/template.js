@@ -1,10 +1,12 @@
 export function interpolate(template, data) {
+  if (!template) return template;
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => {
     return key in data ? data[key] : match;
   });
 }
 
 export function extractPlaceholders(template) {
+  if (!template) return [];
   const matches = [];
   const regex = /\{\{\s*(\w+)\s*\}\}/g;
   let match;

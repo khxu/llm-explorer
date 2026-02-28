@@ -25,7 +25,9 @@ const executionActor = fromCallback(({ sendBack, input }) => {
         const inputSystem = experiment.system_prompt
           ? interpolate(experiment.system_prompt, row.data)
           : null;
-        const inputUser = interpolate(experiment.user_prompt, row.data);
+        const inputUser = experiment.user_prompt
+          ? interpolate(experiment.user_prompt, row.data)
+          : null;
 
         const resultId = await createRunResult({
           experimentId: experiment.id,
@@ -40,7 +42,7 @@ const executionActor = fromCallback(({ sendBack, input }) => {
         try {
           const messages = [];
           if (inputSystem) messages.push({ role: 'system', content: inputSystem });
-          messages.push({ role: 'user', content: inputUser });
+          if (inputUser) messages.push({ role: 'user', content: inputUser });
 
           const response = await providerInstance.chatCompletion({
             model,
