@@ -68,6 +68,20 @@ Then open the app in your browser. The app requires `SharedArrayBuffer` support 
 4. **Results tab** — View and compare outputs across models, export to CSV/JSON
 5. **Logs tab** — Review execution logs for debugging
 
+## Testing
+
+```bash
+npm test          # run all tests once
+npm run test:watch  # run in watch mode
+```
+
+Tests use [Vitest](https://vitest.dev/) and cover the core logic modules:
+
+- **Template engine** — placeholder interpolation, extraction, whitespace handling, edge cases
+- **Export utilities** — results pivoting by model, missing data handling, empty inputs
+- **LLM providers** — base class contracts, OpenRouter/OpenAI request formatting and response parsing (with mocked `fetch`), provider registry and factory
+- **Experiment state machine** — xstate state transitions (idle → executing → completed), progress tracking for completions and errors, cancellation and reset behavior
+
 ## Tech Stack
 
 - [React 19](https://react.dev/) + [Vite](https://vite.dev/)
