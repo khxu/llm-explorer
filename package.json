@@ -10,9 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@primer/primitives": "^11.3.2",
+    "@primer/react": "^38.6.2",
     "@tursodatabase/database-wasm": "^0.3.2",
+    "@xstate/react": "^6.0.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "xstate": "^5.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
