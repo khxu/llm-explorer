@@ -110,7 +110,7 @@ function SettingsPanel() {
                 sx={{ width: '100%' }}
               />
             </FormControl>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
               <Button variant="primary" onClick={() => handleSave(provider)}>Save</Button>
               {exists && (
                 <Button variant="danger" onClick={() => handleDelete(provider)}>Delete</Button>

@@ -281,7 +281,7 @@ export default function ExperimentBuilder() {
       </FormControl>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', marginTop: '8px' }}>
         <Button variant="primary" onClick={handleSave}>
           {editingId ? 'Update Experiment' : 'Save Experiment'}
         </Button>
