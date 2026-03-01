@@ -9,8 +9,9 @@ const TABS = [
   { key: 'logs', label: 'Logs' },
 ];
 
-function Layout({ panels }) {
+function Layout({ panels, machineState }) {
   const [activeTab, setActiveTab] = useState('settings');
+  const isRunning = machineState && machineState.matches('executing');
 
   return (
     <div>
@@ -26,11 +27,16 @@ function Layout({ panels }) {
             }}
           >
             {tab.label}
+            {tab.key === 'experiments' && isRunning && ' ⏳'}
           </UnderlineNav.Item>
         ))}
       </UnderlineNav>
       <div style={{ marginTop: '16px' }}>
-        {panels[activeTab]}
+        {Object.entries(panels).map(([key, panel]) => (
+          <div key={key} style={{ display: activeTab === key ? 'block' : 'none' }}>
+            {panel}
+          </div>
+        ))}
       </div>
     </div>
   );

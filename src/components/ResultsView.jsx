@@ -5,13 +5,14 @@ import { exportToCSV, exportToJSON, formatResultsForExport } from '../utils/expo
 import ResultsTable from './ResultsTable.jsx';
 import ResultsSideBySide from './ResultsSideBySide.jsx';
 
-export default function ResultsView() {
+export default function ResultsView({ machineState }) {
   const [experiments, setExperiments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [view, setView] = useState('table');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadExperiments = useCallback(async () => {
     setLoading(true);
@@ -28,6 +29,15 @@ export default function ResultsView() {
   useEffect(() => {
     loadExperiments();
   }, [loadExperiments]);
+
+  // Auto-refresh when machine transitions to completed
+  const machineValue = machineState ? (typeof machineState.value === 'string' ? machineState.value : Object.keys(machineState.value)[0]) : null;
+  useEffect(() => {
+    if (machineValue === 'completed') {
+      loadExperiments();
+      setRefreshKey((k) => k + 1);
+    }
+  }, [machineValue, loadExperiments]);
 
   const handleExport = async (format) => {
     if (!selectedId) return;
@@ -140,9 +150,9 @@ export default function ResultsView() {
 
           {/* Results content */}
           {view === 'table' ? (
-            <ResultsTable experimentId={selectedId} />
+            <ResultsTable experimentId={selectedId} refreshKey={refreshKey} />
           ) : (
-            <ResultsSideBySide experimentId={selectedId} />
+            <ResultsSideBySide experimentId={selectedId} refreshKey={refreshKey} />
           )}
         </>
       )}

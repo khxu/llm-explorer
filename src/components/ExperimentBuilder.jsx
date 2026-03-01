@@ -8,7 +8,6 @@ import {
   Text,
   Heading,
 } from '@primer/react';
-import { useMachine } from '@xstate/react';
 import { PROVIDER_NAMES } from '../providers/index.js';
 import {
   getAllDatasets,
@@ -20,13 +19,13 @@ import {
   updateExperiment,
   deleteExperiment,
 } from '../db/queries.js';
-import { experimentMachine } from '../machines/experimentMachine.js';
 import PromptEditor from './PromptEditor.jsx';
 import ModelSelector from './ModelSelector.jsx';
 import ExecutionProgress from './ExecutionProgress.jsx';
 
-export default function ExperimentBuilder() {
-  const [state, send] = useMachine(experimentMachine);
+export default function ExperimentBuilder({ machineState, machineSend }) {
+  const state = machineState;
+  const send = machineSend;
 
   // Form state
   const [name, setName] = useState('');
@@ -319,7 +318,7 @@ export default function ExperimentBuilder() {
                 <div>
                   <Text fontWeight="bold">{exp.name || `Experiment #${exp.id}`}</Text>
                   <Text fontSize={0} color="fg.muted" sx={{ ml: 2 }}>
-                    {exp.models?.length || 0} · models · temp {exp.temperature}
+                    {' '}· {exp.models?.length || 0} models · temp {exp.temperature}
                   </Text>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
