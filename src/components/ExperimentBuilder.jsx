@@ -319,7 +319,7 @@ export default function ExperimentBuilder() {
                 <div>
                   <Text fontWeight="bold">{exp.name || `Experiment #${exp.id}`}</Text>
                   <Text fontSize={0} color="fg.muted" sx={{ ml: 2 }}>
-                    {exp.models?.length || 0} models · temp {exp.temperature}
+                    {exp.models?.length || 0} · models · temp {exp.temperature}
                   </Text>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
