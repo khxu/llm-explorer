@@ -30,6 +30,12 @@ body {
   min-height: 100vh;
 }
 
+@media (min-width: 700px) {
+  #root {
+    min-width: 700px;
+  }
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
