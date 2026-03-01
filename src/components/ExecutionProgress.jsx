@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button, Text, Flash } from '@primer/react';
 
 function ProgressBar({ value, max }) {
@@ -25,37 +26,68 @@ function ProgressBar({ value, max }) {
   );
 }
 
-function ResultRow({ result }) {
+function ResultRow({ result, isExpanded, onToggle }) {
   const isError = result.type === 'RUN_ERROR';
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '4px 0',
-        borderBottom: '1px solid var(--borderColor-muted, #d8dee4)',
-        fontSize: 13,
-      }}
-    >
-      <Text fontSize={0}>
-        Row {result.rowIndex} · <strong>{result.model}</strong>
-      </Text>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {isError ? (
-          <Text fontSize={0} color="danger.fg">✗ error</Text>
-        ) : (
-          <>
-            <Text fontSize={0} color="success.fg">✓ success</Text>
-            <Text fontSize={0} color="fg.muted">{result.latencyMs}ms</Text>
-          </>
-        )}
-      </span>
+    <div style={{ borderBottom: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '6px 0',
+          fontSize: 13,
+          cursor: 'pointer',
+        }}
+        onClick={onToggle}
+      >
+        <Text fontSize={0}>
+          Row {result.rowIndex} · <strong>{result.model}</strong>
+        </Text>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isError ? (
+            <Text fontSize={0} color="danger.fg">✗ error</Text>
+          ) : (
+            <>
+              <Text fontSize={0} color="success.fg">✓ success</Text>
+              <Text fontSize={0} color="fg.muted">{result.latencyMs}ms</Text>
+            </>
+          )}
+          <Text fontSize={0} color="fg.muted">{isExpanded ? '▾' : '▸'}</Text>
+        </span>
+      </div>
+      {isExpanded && (
+        <div
+          style={{
+            padding: '6px 8px 10px',
+            fontSize: 12,
+            backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+            borderRadius: 4,
+            marginBottom: 4,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            maxHeight: 200,
+            overflowY: 'auto',
+          }}
+        >
+          {isError ? (
+            <Text color="danger.fg">{result.error}</Text>
+          ) : (
+            <Text>{result.output}</Text>
+          )}
+          {!isError && result.tokensInput != null && (
+            <div style={{ marginTop: 4, color: 'var(--fgColor-muted, #656d76)' }}>
+              Tokens: {result.tokensInput} in / {result.tokensOutput} out
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function ExecutionProgress({ state, send }) {
+  const [expandedId, setExpandedId] = useState(null);
   const stateName = typeof state.value === 'string' ? state.value : Object.keys(state.value)[0];
   const { progress, results, error } = state.context;
 
@@ -86,7 +118,10 @@ export default function ExecutionProgress({ state, send }) {
           Experiment complete — {completed} run{completed !== 1 ? 's' : ''} finished
           {failed > 0 ? ` (${failed} failed)` : ''}.
         </Flash>
-        <Button onClick={() => send({ type: 'RESET' })}>Reset</Button>
+        {results.length > 0 && (
+          <ResultsList results={results} expandedId={expandedId} setExpandedId={setExpandedId} />
+        )}
+        <Button onClick={() => send({ type: 'RESET' })} sx={{ mt: 2 }}>Reset</Button>
       </div>
     );
   }
@@ -94,7 +129,6 @@ export default function ExecutionProgress({ state, send }) {
   // executing state
   const { total, completed, failed } = progress;
   const remaining = total - completed;
-  const recentResults = results.slice(-10);
 
   return (
     <div style={{ padding: '16px 0' }}>
@@ -118,29 +152,44 @@ export default function ExecutionProgress({ state, send }) {
         <Text fontSize={0} color="fg.muted">Remaining: {remaining}</Text>
       </div>
 
-      {recentResults.length > 0 && (
-        <div
-          style={{
-            maxHeight: 240,
-            overflowY: 'auto',
-            border: '1px solid var(--borderColor-default, #d0d7de)',
-            borderRadius: 6,
-            padding: 8,
-            marginBottom: 16,
-          }}
-        >
-          <Text fontWeight="bold" fontSize={0} sx={{ mb: 1, display: 'block' }}>
-            Recent results
-          </Text>
-          {recentResults.map((r, i) => (
-            <ResultRow key={r.resultId ?? i} result={r} />
-          ))}
-        </div>
+      {results.length > 0 && (
+        <ResultsList results={results} expandedId={expandedId} setExpandedId={setExpandedId} />
       )}
 
-      <Button variant="danger" onClick={() => send({ type: 'CANCEL' })}>
+      <Button variant="danger" onClick={() => send({ type: 'CANCEL' })} sx={{ mt: 2 }}>
         Cancel
       </Button>
+    </div>
+  );
+}
+
+function ResultsList({ results, expandedId, setExpandedId }) {
+  // Show most recent first
+  const displayed = [...results].reverse();
+  return (
+    <div
+      style={{
+        maxHeight: 400,
+        overflowY: 'auto',
+        border: '1px solid var(--borderColor-default, #d0d7de)',
+        borderRadius: 6,
+        padding: 8,
+        marginBottom: 8,
+      }}
+    >
+      <Text fontWeight="bold" fontSize={0} sx={{ mb: 1, display: 'block' }}>
+        Results ({results.length})
+      </Text>
+      {displayed.map((r, i) => (
+        <ResultRow
+          key={r.resultId ?? i}
+          result={r}
+          isExpanded={expandedId === (r.resultId ?? i)}
+          onToggle={() =>
+            setExpandedId(expandedId === (r.resultId ?? i) ? null : (r.resultId ?? i))
+          }
+        />
+      ))}
     </div>
   );
 }

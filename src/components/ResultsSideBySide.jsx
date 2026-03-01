@@ -14,7 +14,7 @@ const statusColor = (status) => {
   return 'var(--fgColor-muted, #656d76)';
 };
 
-export default function ResultsSideBySide({ experimentId }) {
+export default function ResultsSideBySide({ experimentId, refreshKey }) {
   const [experiment, setExperiment] = useState(null);
   const [results, setResults] = useState([]);
   const [datasetRows, setDatasetRows] = useState([]);
@@ -43,11 +43,11 @@ export default function ResultsSideBySide({ experimentId }) {
     } finally {
       setLoading(false);
     }
-  }, [experimentId]);
+  }, [experimentId, refreshKey]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   if (!experimentId) {
     return (
