@@ -9,6 +9,7 @@ import {
   getDatasetRows,
   deleteDataset,
 } from '../db/queries.js';
+import InlineDatasetEditor from './InlineDatasetEditor.jsx';
 
 const dropZoneBase = {
   border: '2px dashed',
@@ -40,6 +41,7 @@ export default function DatasetPanel() {
   const [dragActive, setDragActive] = useState(false);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const [rowsPageIndex, setRowsPageIndex] = useState(0);
+  const [createMode, setCreateMode] = useState('csv'); // 'csv' or 'inline'
 
   const loadDatasets = useCallback(async () => {
     try {
@@ -141,6 +143,20 @@ export default function DatasetPanel() {
     setDatasetName('');
   };
 
+  const handleInlineSave = async ({ name, columns, rows }) => {
+    setError(null);
+    setSuccess(null);
+    try {
+      const datasetId = await createDataset(name, columns, rows.length);
+      const datasetRows = rows.map((data, i) => ({ rowIndex: i, data }));
+      await insertDatasetRows(datasetId, datasetRows);
+      setSuccess(`Dataset "${name}" saved with ${rows.length} rows.`);
+      await loadDatasets();
+    } catch (e) {
+      setError(`Failed to save dataset: ${e.message}`);
+    }
+  };
+
   // Build preview DataTable columns from CSV columns
   const previewColumns = uploadPreview
     ? uploadPreview.columns.map((col) => ({
@@ -192,10 +208,47 @@ export default function DatasetPanel() {
         </Flash>
       )}
 
-      {/* CSV Upload Section */}
+      {/* Create Dataset Section */}
       <div style={{ border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px', padding: '16px' }}>
-        <Heading as="h3" style={{ marginBottom: '8px' }}>Upload CSV</Heading>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+          <Heading as="h3" style={{ margin: 0 }}>Create Dataset</Heading>
+          <div style={{ display: 'flex', gap: '2px', marginLeft: 'auto', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px', overflow: 'hidden' }}>
+            <button
+              onClick={() => setCreateMode('csv')}
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: createMode === 'csv' ? 600 : 400,
+                backgroundColor: createMode === 'csv' ? 'var(--bgColor-accent-muted, #ddf4ff)' : 'transparent',
+                color: createMode === 'csv' ? 'var(--fgColor-accent, #0969da)' : 'inherit',
+              }}
+            >
+              Upload CSV
+            </button>
+            <button
+              onClick={() => setCreateMode('inline')}
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                border: 'none',
+                borderLeft: '1px solid var(--borderColor-default, #d0d7de)',
+                cursor: 'pointer',
+                fontWeight: createMode === 'inline' ? 600 : 400,
+                backgroundColor: createMode === 'inline' ? 'var(--bgColor-accent-muted, #ddf4ff)' : 'transparent',
+                color: createMode === 'inline' ? 'var(--fgColor-accent, #0969da)' : 'inherit',
+              }}
+            >
+              Manual Entry
+            </button>
+          </div>
+        </div>
 
+        {createMode === 'inline' ? (
+          <InlineDatasetEditor onSave={handleInlineSave} />
+        ) : (
+        <>
         {!uploadPreview ? (
           <>
             <div
@@ -263,6 +316,8 @@ export default function DatasetPanel() {
             </div>
           </div>
         )}
+        </>
+        )}
       </div>
 
       {/* Existing Datasets List */}
@@ -270,7 +325,7 @@ export default function DatasetPanel() {
         <Heading as="h3" style={{ marginBottom: '8px' }}>Saved Datasets</Heading>
 
         {datasets.length === 0 ? (
-          <Text>No datasets yet. Upload a CSV to get started.</Text>
+          <Text>No datasets yet. Upload a CSV or create one manually to get started.</Text>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {datasets.map((ds) => (
