@@ -121,7 +121,56 @@ export default function ExecutionProgress({ state, send }) {
         {results.length > 0 && (
           <ResultsList results={results} expandedId={expandedId} setExpandedId={setExpandedId} />
         )}
-        <Button onClick={() => send({ type: 'RESET' })} sx={{ mt: 2 }}>Reset</Button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {failed > 0 && (
+            <Button variant="primary" onClick={() => send({ type: 'RETRY_FAILED' })}>
+              Retry Failed ({failed})
+            </Button>
+          )}
+          <Button onClick={() => send({ type: 'RESET' })}>Reset</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (stateName === 'paused') {
+    const { total, completed, failed } = progress;
+    const remaining = total - completed;
+    return (
+      <div style={{ padding: '16px 0' }}>
+        <Flash variant="warning" sx={{ mb: 3 }}>
+          Experiment paused — {completed} / {total} completed
+          {failed > 0 ? ` (${failed} failed)` : ''}.
+        </Flash>
+
+        <ProgressBar value={completed} max={total} />
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 16,
+            marginTop: 8,
+            marginBottom: 12,
+            fontSize: 13,
+          }}
+        >
+          <Text fontSize={0} color="fg.muted">Completed: {completed}</Text>
+          <Text fontSize={0} color="danger.fg">Failed: {failed}</Text>
+          <Text fontSize={0} color="fg.muted">Remaining: {remaining}</Text>
+        </div>
+
+        {results.length > 0 && (
+          <ResultsList results={results} expandedId={expandedId} setExpandedId={setExpandedId} />
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <Button variant="primary" onClick={() => send({ type: 'RESUME' })}>
+            Resume
+          </Button>
+          <Button variant="danger" onClick={() => send({ type: 'CANCEL' })}>
+            Cancel
+          </Button>
+        </div>
       </div>
     );
   }
@@ -156,9 +205,14 @@ export default function ExecutionProgress({ state, send }) {
         <ResultsList results={results} expandedId={expandedId} setExpandedId={setExpandedId} />
       )}
 
-      <Button variant="danger" onClick={() => send({ type: 'CANCEL' })} sx={{ mt: 2 }}>
-        Cancel
-      </Button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <Button onClick={() => send({ type: 'PAUSE' })}>
+          Pause
+        </Button>
+        <Button variant="danger" onClick={() => send({ type: 'CANCEL' })}>
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

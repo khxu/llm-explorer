@@ -2,7 +2,10 @@ import { setup, assign, fromCallback } from 'xstate';
 import {
   createRunResult,
   updateRunResult,
+  deleteRunResults,
   addLog,
+  updateExecutionStatus,
+  deleteExecutionState,
 } from '../db/queries.js';
 import { createProvider } from '../providers/index.js';
 import { interpolate } from '../utils/template.js';
@@ -11,9 +14,22 @@ const executionActor = fromCallback(({ sendBack, input }) => {
   let cancelled = false;
 
   async function run() {
-    const { experiment, datasetRows, provider, apiKey } = input;
+    const { experiment, datasetRows, provider, apiKey, completedResults, deleteResultIds, runId } = input;
     const providerInstance = createProvider(provider, apiKey);
     const models = experiment.models;
+
+    // Delete old error results before retrying
+    if (deleteResultIds?.length) {
+      await deleteRunResults(deleteResultIds);
+    }
+
+    // Build set of already-completed pairs to skip
+    const skipPairs = new Set();
+    if (completedResults?.length) {
+      for (const r of completedResults) {
+        skipPairs.add(`${r.rowIndex}:${r.model}`);
+      }
+    }
 
     for (const row of datasetRows) {
       for (const model of models) {
@@ -21,6 +37,8 @@ const executionActor = fromCallback(({ sendBack, input }) => {
           sendBack({ type: 'CANCELLED' });
           return;
         }
+
+        if (skipPairs.has(`${row.row_index}:${model}`)) continue;
 
         const inputSystem = experiment.system_prompt
           ? interpolate(experiment.system_prompt, row.data)
@@ -37,6 +55,7 @@ const executionActor = fromCallback(({ sendBack, input }) => {
           status: 'running',
           inputSystem,
           inputUser,
+          runId,
         });
 
         try {
@@ -103,6 +122,45 @@ const executionActor = fromCallback(({ sendBack, input }) => {
   };
 });
 
+// Shared action: keep only successes, queue error result IDs for deletion
+const prepareRetry = assign(({ context }) => {
+  const errorResults = context.results.filter(r => r.type === 'RUN_ERROR');
+  const successResults = context.results.filter(r => r.type !== 'RUN_ERROR');
+  return {
+    results: successResults,
+    deleteResultIds: errorResults.map(r => r.resultId).filter(Boolean),
+    progress: {
+      total: context.progress.total,
+      completed: successResults.length,
+      failed: 0,
+    },
+    cancelled: false,
+  };
+});
+
+// Persistence helpers (fire-and-forget with error logging)
+const persistStatus = (status) => ({ context }) => {
+  if (context.runId) updateExecutionStatus(context.runId, status).catch(() => {});
+};
+const persistDelete = ({ context }) => {
+  if (context.runId) deleteExecutionState(context.runId).catch(() => {});
+};
+
+// Shared assign for RESTORE event
+const restoreAssign = assign(({ event }) => ({
+  experiment: event.experiment,
+  datasetRows: event.datasetRows,
+  models: event.experiment.models,
+  provider: event.provider,
+  apiKey: event.apiKey,
+  results: event.results,
+  progress: event.progress,
+  runId: event.runId,
+  error: null,
+  cancelled: false,
+  deleteResultIds: [],
+}));
+
 export const experimentMachine = setup({
   actors: { executionActor },
 }).createMachine({
@@ -118,6 +176,8 @@ export const experimentMachine = setup({
     progress: { total: 0, completed: 0, failed: 0 },
     error: null,
     cancelled: false,
+    deleteResultIds: [],
+    runId: null,
   },
   states: {
     idle: {
@@ -138,8 +198,21 @@ export const experimentMachine = setup({
             },
             error: null,
             cancelled: false,
+            deleteResultIds: [],
+            runId: event.runId,
           })),
         },
+        RESTORE: [
+          {
+            guard: ({ event }) => event.status === 'completed',
+            target: 'completed',
+            actions: restoreAssign,
+          },
+          {
+            target: 'paused',
+            actions: restoreAssign,
+          },
+        ],
       },
     },
     executing: {
@@ -150,6 +223,9 @@ export const experimentMachine = setup({
           datasetRows: context.datasetRows,
           provider: context.provider,
           apiKey: context.apiKey,
+          completedResults: context.results,
+          deleteResultIds: context.deleteResultIds,
+          runId: context.runId,
         }),
       },
       on: {
@@ -172,29 +248,81 @@ export const experimentMachine = setup({
             },
           })),
         },
-        BATCH_DONE: { target: 'completed' },
+        BATCH_DONE: {
+          target: 'completed',
+          actions: persistStatus('completed'),
+        },
         CANCELLED: {
           target: 'idle',
-          actions: assign({ cancelled: true }),
+          actions: [assign({ cancelled: true }), persistDelete],
         },
         CANCEL: {
           target: 'idle',
-          actions: assign({ cancelled: true }),
+          actions: [assign({ cancelled: true }), persistDelete],
+        },
+        PAUSE: {
+          target: 'paused',
+          actions: persistStatus('paused'),
+        },
+      },
+    },
+    paused: {
+      on: {
+        // Handle straggling events from the just-stopped actor
+        RUN_COMPLETE: {
+          actions: assign(({ context, event }) => ({
+            results: [...context.results, event],
+            progress: {
+              ...context.progress,
+              completed: context.progress.completed + 1,
+            },
+          })),
+        },
+        RUN_ERROR: {
+          actions: assign(({ context, event }) => ({
+            results: [...context.results, event],
+            progress: {
+              ...context.progress,
+              completed: context.progress.completed + 1,
+              failed: context.progress.failed + 1,
+            },
+          })),
+        },
+        BATCH_DONE: {
+          target: 'completed',
+          actions: persistStatus('completed'),
+        },
+        RESUME: {
+          target: 'executing',
+          actions: [prepareRetry, persistStatus('running')],
+        },
+        CANCEL: {
+          target: 'idle',
+          actions: [assign({ cancelled: true }), persistDelete],
         },
       },
     },
     completed: {
       on: {
+        RETRY_FAILED: {
+          target: 'executing',
+          actions: [prepareRetry, persistStatus('running')],
+        },
         RESET: {
           target: 'idle',
-          actions: assign({
-            experiment: null,
-            datasetRows: [],
-            models: [],
-            results: [],
-            progress: { total: 0, completed: 0, failed: 0 },
-            error: null,
-          }),
+          actions: [
+            assign({
+              experiment: null,
+              datasetRows: [],
+              models: [],
+              results: [],
+              progress: { total: 0, completed: 0, failed: 0 },
+              error: null,
+              deleteResultIds: [],
+              runId: null,
+            }),
+            persistDelete,
+          ],
         },
       },
     },
@@ -202,14 +330,19 @@ export const experimentMachine = setup({
       on: {
         RESET: {
           target: 'idle',
-          actions: assign({
-            experiment: null,
-            datasetRows: [],
-            models: [],
-            results: [],
-            progress: { total: 0, completed: 0, failed: 0 },
-            error: null,
-          }),
+          actions: [
+            assign({
+              experiment: null,
+              datasetRows: [],
+              models: [],
+              results: [],
+              progress: { total: 0, completed: 0, failed: 0 },
+              error: null,
+              deleteResultIds: [],
+              runId: null,
+            }),
+            persistDelete,
+          ],
         },
       },
     },

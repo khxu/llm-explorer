@@ -167,10 +167,10 @@ function parseExperimentRow(row) {
 
 // --- Run Results ---
 
-export async function createRunResult({ experimentId, datasetRowId, model, provider, status, inputSystem, inputUser }) {
+export async function createRunResult({ experimentId, datasetRowId, model, provider, status, inputSystem, inputUser, runId }) {
   const result = await database.prepare(
-    `INSERT INTO run_results (experiment_id, dataset_row_id, model, provider, status, input_system, input_user)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO run_results (experiment_id, dataset_row_id, model, provider, status, input_system, input_user, run_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     experimentId,
     datasetRowId || null,
@@ -178,7 +178,8 @@ export async function createRunResult({ experimentId, datasetRowId, model, provi
     provider,
     status || 'pending',
     inputSystem || null,
-    inputUser || null
+    inputUser || null,
+    runId || null
   );
   await checkpoint();
   return result.lastInsertRowid;
@@ -227,6 +228,13 @@ export async function getRunResult(id) {
   return rows[0] || null;
 }
 
+export async function deleteRunResults(ids) {
+  for (const id of ids) {
+    await database.prepare('DELETE FROM run_results WHERE id = ?').run(id);
+  }
+  if (ids.length) await checkpoint();
+}
+
 // --- Logs ---
 
 export async function addLog({ experimentId, runResultId, level, message, metadata }) {
@@ -268,4 +276,40 @@ export async function getLogs({ experimentId, level, limit } = {}) {
     ...row,
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
   }));
+}
+
+// --- Execution State ---
+
+export async function createExecutionState(experimentId, provider) {
+  await database.prepare('DELETE FROM execution_state').run();
+  const result = await database.prepare(
+    'INSERT INTO execution_state (experiment_id, provider, status) VALUES (?, ?, ?)'
+  ).run(experimentId, provider, 'running');
+  await checkpoint();
+  return result.lastInsertRowid;
+}
+
+export async function updateExecutionStatus(id, status) {
+  await database.prepare(
+    'UPDATE execution_state SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).run(status, id);
+  await checkpoint();
+}
+
+export async function deleteExecutionState(id) {
+  await database.prepare('DELETE FROM execution_state WHERE id = ?').run(id);
+  await checkpoint();
+}
+
+export async function getActiveExecutionState() {
+  const rows = await database.prepare(
+    'SELECT * FROM execution_state ORDER BY id DESC LIMIT 1'
+  ).all();
+  return rows[0] || null;
+}
+
+export async function getRunResultsByRunId(runId) {
+  return database.prepare(
+    'SELECT * FROM run_results WHERE run_id = ? ORDER BY id'
+  ).all(runId);
 }

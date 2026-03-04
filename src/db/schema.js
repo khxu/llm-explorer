@@ -87,4 +87,22 @@ export async function initSchema() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS execution_state (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      experiment_id INTEGER NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Migration: add run_id column to run_results
+  try {
+    await database.exec('ALTER TABLE run_results ADD COLUMN run_id INTEGER');
+  } catch {
+    // Column already exists
+  }
 }
