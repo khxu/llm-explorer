@@ -18,6 +18,12 @@ import {
   getExperiment,
   updateExperiment,
   deleteExperiment,
+  getActiveExecutionState,
+  createExecutionState,
+  deleteExecutionState,
+  deleteRunResults,
+  getRunResultsByRunId,
+  updateExecutionStatus,
 } from '../db/queries.js';
 import PromptEditor from './PromptEditor.jsx';
 import ModelSelector from './ModelSelector.jsx';
@@ -46,6 +52,7 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
 
   // UI state
   const [flash, setFlash] = useState(null);
+  const [restoring, setRestoring] = useState(true);
 
   const loadData = useCallback(async () => {
     const [ds, exps] = await Promise.all([getAllDatasets(), getAllExperiments()]);
@@ -54,6 +61,101 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect
+
+  // Restore execution state from DB on mount
+  useEffect(() => {
+    async function restoreExecution() {
+      try {
+        const execState = await getActiveExecutionState();
+        if (!execState) return;
+
+        const experiment = await getExperiment(execState.experiment_id);
+        if (!experiment || !experiment.dataset_id) {
+          await deleteExecutionState(execState.id);
+          return;
+        }
+
+        const datasetRows = await getDatasetRows(experiment.dataset_id);
+        if (datasetRows.length === 0) {
+          await deleteExecutionState(execState.id);
+          return;
+        }
+
+        const apiKeyRow = await getApiKey(execState.provider);
+        const runResults = await getRunResultsByRunId(execState.id);
+
+        // Clean up stale 'running' entries (in-flight when browser closed)
+        const staleRunning = runResults.filter(r => r.status === 'running');
+        if (staleRunning.length) {
+          await deleteRunResults(staleRunning.map(r => r.id));
+        }
+        const validResults = runResults.filter(r => r.status !== 'running');
+
+        // Build row_index lookup from dataset rows
+        const rowIndexMap = new Map(datasetRows.map(r => [r.id, r.row_index]));
+
+        // Reconstruct event-shaped results for the machine context
+        const results = validResults.map(r => {
+          const rowIndex = rowIndexMap.get(r.dataset_row_id) ?? 0;
+          if (r.status === 'success') {
+            return {
+              type: 'RUN_COMPLETE',
+              resultId: r.id,
+              model: r.model,
+              rowIndex,
+              output: r.output,
+              tokensInput: r.tokens_input,
+              tokensOutput: r.tokens_output,
+              latencyMs: r.latency_ms,
+            };
+          }
+          return {
+            type: 'RUN_ERROR',
+            resultId: r.id,
+            model: r.model,
+            rowIndex,
+            error: r.error,
+          };
+        });
+
+        const total = datasetRows.length * experiment.models.length;
+        const completed = results.length;
+        const failed = results.filter(r => r.type === 'RUN_ERROR').length;
+
+        // If status was 'running', it was interrupted — treat as paused
+        const status = execState.status === 'completed' ? 'completed' : 'paused';
+        if (execState.status === 'running') {
+          await updateExecutionStatus(execState.id, 'paused');
+        }
+
+        send({
+          type: 'RESTORE',
+          experiment,
+          datasetRows,
+          provider: execState.provider,
+          apiKey: apiKeyRow?.api_key || '',
+          results,
+          progress: { total, completed, failed },
+          runId: execState.id,
+          status,
+        });
+
+        // Populate form fields
+        setEditingId(experiment.id);
+        setName(experiment.name || '');
+        setDatasetId(experiment.dataset_id ? String(experiment.dataset_id) : '');
+        setSystemPrompt(experiment.system_prompt || '');
+        setUserPrompt(experiment.user_prompt || '');
+        setSelectedModels(experiment.models || []);
+        setTemperature(experiment.temperature ?? 1.0);
+        setMaxTokens(experiment.max_tokens ?? 1024);
+        setProvider(execState.provider);
+      } finally {
+        setRestoring(false);
+      }
+    }
+    restoreExecution();
+  }, [send]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load API key when provider changes
   useEffect(() => {
@@ -143,7 +245,8 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
       }
 
       setFlash(null);
-      send({ type: 'START', experiment, datasetRows, provider, apiKey });
+      const runId = await createExecutionState(expId, provider);
+      send({ type: 'START', experiment, datasetRows, provider, apiKey, runId });
     } catch (err) {
       setFlash({ variant: 'danger', msg: err.message });
     }
@@ -169,6 +272,15 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
     await loadData();
     setFlash({ variant: 'success', msg: 'Experiment deleted.' });
   };
+
+  if (restoring) {
+    return (
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 0' }}>
+        <Heading sx={{ mb: 3 }}>Experiment Builder</Heading>
+        <Text color="fg.muted">Loading…</Text>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 0' }}>
@@ -284,7 +396,7 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
         <Button variant="primary" onClick={handleSave}>
           {editingId ? 'Update Experiment' : 'Save Experiment'}
         </Button>
-        <Button onClick={handleRun} disabled={state.matches('executing')}>
+        <Button onClick={handleRun} disabled={state.matches('executing') || state.matches('paused')}>
           Run Experiment
         </Button>
         {editingId && (
