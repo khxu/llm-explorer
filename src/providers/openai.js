@@ -17,7 +17,7 @@ export class OpenAIProvider extends LLMProvider {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
+      body: JSON.stringify({ model, messages, temperature, max_completion_tokens: maxTokens }),
     });
     const latencyMs = performance.now() - start;
 

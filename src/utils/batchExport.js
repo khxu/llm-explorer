@@ -22,7 +22,7 @@ export function generateBatchJSONL({ experiment, datasetRows, model }) {
       model,
       messages,
       temperature: experiment.temperature ?? 1.0,
-      max_tokens: experiment.max_tokens ?? 1024,
+      max_completion_tokens: experiment.max_tokens ?? 1024,
     };
 
     return JSON.stringify({
