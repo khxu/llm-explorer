@@ -19,7 +19,7 @@ const levelBgColors = {
   debug: 'var(--bgColor-muted, #f6f8fa)',
 };
 
-export default function LogsPanel() {
+export default function LogsPanel({ isActive }) {
   const [experiments, setExperiments] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,9 +62,13 @@ export default function LogsPanel() {
     loadExperiments();
   }, [loadExperiments]);
 
+  // Re-fetch when tab becomes active
   useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
+    if (isActive) {
+      loadExperiments();
+      loadLogs();
+    }
+  }, [isActive, loadExperiments, loadLogs]);
 
   const columns = [
     {

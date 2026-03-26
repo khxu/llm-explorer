@@ -5,7 +5,7 @@ import { exportToCSV, exportToJSON, formatResultsForExport } from '../utils/expo
 import ResultsTable from './ResultsTable.jsx';
 import ResultsSideBySide from './ResultsSideBySide.jsx';
 
-export default function ResultsView({ machineState }) {
+export default function ResultsView({ machineState, isActive }) {
   const [experiments, setExperiments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [view, setView] = useState('table');
@@ -29,6 +29,11 @@ export default function ResultsView({ machineState }) {
   useEffect(() => {
     loadExperiments();
   }, [loadExperiments]);
+
+  // Re-fetch when tab becomes active
+  useEffect(() => {
+    if (isActive) loadExperiments();
+  }, [isActive, loadExperiments]);
 
   // Auto-refresh when machine transitions to completed
   const machineValue = machineState ? (typeof machineState.value === 'string' ? machineState.value : Object.keys(machineState.value)[0]) : null;

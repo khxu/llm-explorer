@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, cloneElement } from 'react';
 import { UnderlineNav, Heading } from '@primer/react';
 
 const TABS = [
@@ -6,6 +6,7 @@ const TABS = [
   { key: 'datasets', label: 'Datasets' },
   { key: 'experiments', label: 'Experiments' },
   { key: 'results', label: 'Results' },
+  { key: 'batchExport', label: 'Batch Export' },
   { key: 'logs', label: 'Logs' },
 ];
 
@@ -34,7 +35,7 @@ function Layout({ panels, machineState }) {
       <div style={{ marginTop: '16px' }}>
         {Object.entries(panels).map(([key, panel]) => (
           <div key={key} style={{ display: activeTab === key ? 'block' : 'none' }}>
-            {panel}
+            {cloneElement(panel, { isActive: activeTab === key })}
           </div>
         ))}
       </div>
