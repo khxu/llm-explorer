@@ -29,7 +29,7 @@ import PromptEditor from './PromptEditor.jsx';
 import ModelSelector from './ModelSelector.jsx';
 import ExecutionProgress from './ExecutionProgress.jsx';
 
-export default function ExperimentBuilder({ machineState, machineSend }) {
+export default function ExperimentBuilder({ machineState, machineSend, isActive }) {
   const state = machineState;
   const send = machineSend;
 
@@ -61,6 +61,9 @@ export default function ExperimentBuilder({ machineState, machineSend }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]); // eslint-disable-line react-hooks/set-state-in-effect
+
+  // Re-fetch when tab becomes active
+  useEffect(() => { if (isActive) loadData(); }, [isActive, loadData]);
 
   // Restore execution state from DB on mount
   useEffect(() => {

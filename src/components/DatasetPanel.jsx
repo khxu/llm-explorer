@@ -29,7 +29,7 @@ const dropZoneActive = {
 
 const PAGE_SIZE = 10;
 
-export default function DatasetPanel() {
+export default function DatasetPanel({ isActive }) {
   const [datasets, setDatasets] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState(null);
   const [selectedDatasetRows, setSelectedDatasetRows] = useState([]);
@@ -55,6 +55,11 @@ export default function DatasetPanel() {
   useEffect(() => {
     loadDatasets();
   }, [loadDatasets]);
+
+  // Re-fetch when tab becomes active
+  useEffect(() => {
+    if (isActive) loadDatasets();
+  }, [isActive, loadDatasets]);
 
   const handleFile = async (file) => {
     if (!file || !file.name.endsWith('.csv')) {
